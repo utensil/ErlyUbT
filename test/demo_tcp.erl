@@ -1,5 +1,8 @@
--module(server).
--export([server/0]).
+-module(demo_tcp).
+-export([start_server/0, server/0, client/0]).
+
+start_server() ->
+    spawn(fun() -> server() end).
 
 server() ->
     {ok, LSock} = gen_tcp:listen(3561, [binary, {packet, 0},
@@ -19,3 +22,8 @@ do_recv(Sock, Bs) ->
             {ok, list_to_binary(Bs)}
     end.
 
+client() ->
+    {ok, Sock} = gen_tcp:connect("localhost", 3561, [binary, {packet, 0}]),
+    {ok, Data} = file:read_file("restproject.swf"),
+    ok = gen_tcp:send(Sock, Data),
+    ok = gen_tcp:close(Sock).
