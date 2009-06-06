@@ -34,8 +34,8 @@ client(N) ->
     term_to_binary(N)),
     Value = receive
                 {udp, Socket, A, B, Bin} = Msg ->
-                io:format("~p~n", [[A, B]]),
                 io:format("client received:~p~n" ,[Msg]),
+                io:format("from ~p:~p~n", [A, B]),
                 binary_to_term(Bin)
             after 2000 ->
                 0
