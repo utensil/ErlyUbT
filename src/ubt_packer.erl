@@ -1,22 +1,7 @@
 -module(ubt_packer).
 -export([unpack/1, pack/1]).
 
--define(N_32, 32/unsigned-big-integer).
--define(N_16, 16/unsigned-big-integer).
--define(N_8, 8/unsigned-big-integer).
-
--record(udp_header,
-    {
-        src_port = 0,
-        dst_port = 0,
-        seq_no = 0,
-        ack_no = 0,
-        syn = 0,
-        ack = 0,
-        rst = 0,
-        fin = 0,
-        wndw = 0
-    }).
+-include("ubt_header.hrl").
 
 unpack(<<SrcPort : ?N_16,
       DstPort : ?N_16,
@@ -36,7 +21,7 @@ unpack(<<SrcPort : ?N_16,
       Checksum :?N_16,
       Urg_ptr :?N_16,
       Rest/binary>>) ->
-      Header = #udp_header{
+      Header = #ubt_header{
             src_port = SrcPort,
             dst_port = DstPort,
             seq_no = SeqNo,
@@ -49,7 +34,7 @@ unpack(<<SrcPort : ?N_16,
         },
       { Header, Rest }.
 
-pack({{ Header, Rest }}) ->
+pack({ Header, Rest }) ->
     {SrcPort, DstPort, SeqNo, AckNo, Syn, Ack, Rst, Fin, Wndw}
         = Header,
     { DataOffset, Reserved, Urg, Psh, Checksum, Urg_ptr}

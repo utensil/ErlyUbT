@@ -1,6 +1,8 @@
 -module(ubt_socket).
 -export([connect/3, listen/2, accept/1, close/1]).
 -export([send/2, recv/2]).
+
+-import(ubt_packer).
 %-export([connect/3, connect/4, listen/2, accept/1, accept/2,
 %	 shutdown/2, close/1]).
 %-export([send/2, recv/2, recv/3, unrecv/2]).
@@ -11,17 +13,34 @@
 %% Connect a socket
 %%
 connect(Address, Port, Opts) ->
-    connect(Address,Port,Opts,infinity).
-
-connect(Address, Port, Opts, Time) ->
-    Timer = inet:start_timer(Time),
-    Res = (catch connect1(Address,Port,Opts,Timer)),
-    inet:stop_timer(Timer),
-    case Res of
-	{ok,S} -> {ok,S};
-	{error, einval} -> exit(badarg);
-	{'EXIT',Reason} -> exit(Reason);
-	Error -> Error
+    {ok, Socket} = gen_udp:open(0, [binary]),
+    OtherInfo = 0,
+    ConnectHeader = #udp_header{
+        syn = 1,
+        src_port = port(Socket),
+        dst_port = Port,
+        seq_no = 0 %TODO gen_isn()
+    },
+    ConnectPacket = ubt_packer:pack({ConnectHeader, <<>>}),
+    ok = gen_udp:send(Socket, Address , Port, ConnectPacket),
+    receive
+        {udp, Socket, _, _, Packet} ->
+            case ubt_packer:unpack(Packet) of
+                { Header, Rest } when Header#udp_header.syn == 1 ->
+                    EstablishedHeader = #udp_header{
+                        syn = 0,
+                        ack = 1,
+                        src_port = port(Socket),
+                        dst_port = Port,
+                        seq_no = 1, %TODO gen_isn()
+                        ack_no = Header#udp_header.seq_no + 1
+                    },
+                    EstablishedPacket = ubt_packer:pack({EstablishedHeader, <<>>}),
+                    ok = gen_udp:send(Socket, Address , Port, EstablishedPacket),
+                    {ok, Socket, OtherInfo};
+                Error ->
+                    {error, Socket, OtherInfo}
+            end
     end.
 
 %%
