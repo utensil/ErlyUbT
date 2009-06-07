@@ -1,6 +1,6 @@
 -module(name_server).
 -export([init/0, add/2, whereis/1, exception/1, handle/2]).
--import(server2, [rpc/2]).
+-import(server3, [rpc/2]).
 
 %% client routines
 add(Name, Place) ->
