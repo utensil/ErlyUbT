@@ -22,10 +22,6 @@ server(State, Action, Info) ->
             % close -> fin_wait_1
             loop(State, Info);
         established ->
-            loop(State, Info);
-        close_wait ->
-            loop(State, Info);
-        last_ack ->
             loop(State, Info)
     end.
 
@@ -34,13 +30,17 @@ client(State, Action, Info) ->
     case State of
         closed ->
             %listen -> listen
-            
             loop(State, Info);
         syn_sent ->
             % r_syn_ack -> established
             loop(State, Info);
         established ->
-            loop(State, Info);
+            loop(State, Info)
+    end.
+    
+active_close() ->
+    case State of
+        %%
         fin_wait_1 ->
             loop(State, Info);
         fin_wait_2 ->
@@ -50,37 +50,13 @@ client(State, Action, Info) ->
         closing ->
             loop(State, Info)
     end.
-    
 
-loop(State, Action, Info) ->
+passive_close() ->
     case State of
-        closed ->
-            %listen -> listen
-            %connect -> syn_sent
-            loop(State, Info);
-        listen ->
-            %close -> closed
-            % r_syn -> syn_rcvd
-
-            loop(State, Info);
-        syn_rcvd ->
-            % close -> fin_wait_1
-            loop(State, Info);
-        syn_sent ->
-            % r_syn_ack -> established
-            loop(State, Info);
-        established ->
-            loop(State, Info);
-        fin_wait_1 ->
-            loop(State, Info);
-        fin_wait_2 ->
-            loop(State, Info);
-        timed_wait ->
-            loop(State, Info);
-        closing ->
-            loop(State, Info);
+        %%
         close_wait ->
             loop(State, Info);
         last_ack ->
             loop(State, Info)
-    end.
+    end
+
