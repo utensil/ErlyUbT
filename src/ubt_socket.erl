@@ -1,5 +1,5 @@
 -module(ubt_socket).
--export([connect/3]).
+-export([connect/3, listen/2, accept/1]).
 %-export([connect/3, listen/2, accept/1, close/1]).
 %-export([send/2, recv/2]).
 -include("ubt_header.hrl").
@@ -15,61 +15,78 @@
 %%
 connect(Address, Port, Opts) ->
     {ok, Socket} = gen_udp:open(0, [binary]),
-    OtherInfo = 0,
     {ok, LocalPort} = inet:port(Socket),
+    % Shake hand step 1
     ConnectHeader = #ubt_header{
         syn = 1,
         src_port = LocalPort,
         dst_port = Port,
-        seq_no = 0 %TODO gen_isn()
+        seq_no = 0
     },
-    io:format("~p~n", [ConnectHeader]),
     ConnectPacket = ubt_packer:pack({ConnectHeader, <<>>}),
     ok = gen_udp:send(Socket, Address , Port, ConnectPacket),
     receive
-        {udp, Socket, _, _, Packet} ->
-            case ubt_packer:unpack(Packet) of
-                { Header, Rest } when Header#ubt_header.syn == 1 ->
+        {udp, Socket,  _, _, Packet} ->
+            { Header, Rest } = ubt_packer:unpack(Packet),
+            if Header#ubt_header.syn == 1 ->
+                    % TODO: set_things_up()
+                    % Shake hand step 3
+                    {ok, LocalPort} = inet:port(Socket),
                     EstablishedHeader = #ubt_header{
                         syn = 0,
                         ack = 1,
-                        src_port = inet:port(Socket),
+                        src_port = LocalPort,
                         dst_port = Port,
-                        seq_no = 1, %TODO gen_isn()
+                        seq_no = 1,
                         ack_no = Header#ubt_header.seq_no + 1
                     },
+                    io:format("~p~n", [EstablishedHeader]),
                     EstablishedPacket = ubt_packer:pack({EstablishedHeader, <<>>}),
-                    ok = gen_udp:send(Socket, Address , Port, EstablishedPacket),
-                    {ok, Socket, OtherInfo};
-                Error ->
-                    {error, Socket, OtherInfo}
+                    ok = gen_udp:send(Socket, Address, Port, EstablishedPacket),
+                    {ok, Socket}
             end
     end.
 
-%%%
-%%% Listen on a tcp port
-%%%
-%listen(Port, Opts) ->
-%    Mod = mod(Opts),
-%    case Mod:getserv(Port) of
-%	{ok,TP} ->
-%	    Mod:listen(TP, Opts);
-%	{error,einval} ->
-%	    exit(badarg);
-%	Other -> Other
-%    end.
-%
-%%%
-%%% Generic tcp accept
-%%%
-%accept(S) ->
-%    case inet_db:lookup_socket(S) of
-%	{ok, Mod} ->
-%	    Mod:accept(S);
-%	Error ->
-%	    Error
-%    end.
-%
+%%
+%% Listen on a tcp port
+%%
+listen(Port, Opts) ->
+    {ok, Socket} = gen_udp:open(Port, [binary]),
+    {ok, Socket}.
+
+%%
+%% Generic tcp accept
+%%
+accept(Socket) ->
+    receive
+        {udp, Socket, Address, Port, Packet} ->
+            io:format("~p~n", [{udp, Socket, Address, Port, Packet}]),
+            { Header, Rest } = ubt_packer:unpack(Packet),
+            % Shake hand step 2
+            % set_things_up()
+            {ok, LocalPort} = inet:port(Socket),
+            ConfirmConnectHeader = #ubt_header{
+                syn = 1,
+                ack = 1,
+                src_port = LocalPort,
+                dst_port = Port,
+                seq_no = 0,
+                ack_no = Header#ubt_header.seq_no + 1
+            },
+            io:format("~p~n", [ConfirmConnectHeader]),
+            ConfirmConnectPacket = ubt_packer:pack({ConfirmConnectHeader, <<>>}),
+            ok = gen_udp:send(Socket, Address, Port, ConfirmConnectPacket),
+            receive
+                {udp, Socket, Address, Port, Packet} ->
+                    { Header, Rest } = ubt_packer:unpack(Packet),
+                    if ((Header#ubt_header.syn == 0)
+                        and (Header#ubt_header.ack == 1))
+                        and (Header#ubt_header.rst == 0) ->
+                        {ok, Socket}
+                    end
+             end
+    end.
+
 %%%
 %%% Close
 %%%
