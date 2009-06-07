@@ -34,8 +34,8 @@ unpack(<<SrcPort : ?N_16,
         },
       { Header, Rest }.
 
-pack({ Header, Rest }) ->
-    {SrcPort, DstPort, SeqNo, AckNo, Syn, Ack, Rst, Fin, Wndw}
+pack({Header, Rest}) ->
+    {ubt_header, SrcPort, DstPort, SeqNo, AckNo, Syn, Ack, Rst, Fin, Wndw}
         = Header,
     { DataOffset, Reserved, Urg, Psh, Checksum, Urg_ptr}
         = { 0, 0, 0, 0, 0, 0},
