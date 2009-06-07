@@ -7,15 +7,15 @@
 
 -record(udp_header,
     {
-        src_port,
-        dst_port,
-        seq_no,
-        ack_no,
-        syn,
-        ack,
-        rst,
-        fin,
-        wndw
+        src_port = 0,
+        dst_port = 0,
+        seq_no = 0,
+        ack_no = 0,
+        syn = 0,
+        ack = 0,
+        rst = 0,
+        fin = 0,
+        wndw = 0
     }).
 
 unpack(<<SrcPort : ?N_16,
