@@ -1,6 +1,9 @@
 -define(N_32, 32/unsigned-big-integer).
 -define(N_16, 16/unsigned-big-integer).
 -define(N_8, 8/unsigned-big-integer).
+-define(N_6, 6/unsigned-big-integer).
+-define(N_4, 4/unsigned-big-integer).
+-define(N_1, 1/unsigned-big-integer).
 
 -record(ubt_header,
     {
