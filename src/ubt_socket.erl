@@ -1,6 +1,5 @@
 -module(ubt_socket).
--export([connect/3, listen/2, accept/1]).
-%-export([connect/3, listen/2, accept/1, close/1]).
+-export([connect/2, listen/1, accept/1, close/1]).
 %-export([send/2, recv/2]).
 -include("ubt_header.hrl").
 
@@ -13,7 +12,7 @@
 %%
 %% Connect a socket
 %%
-connect(Address, Port, Opts) ->
+connect(Address, Port) ->
     {ok, Socket} = gen_udp:open(0, [binary]),
     {ok, LocalPort} = inet:port(Socket),
     % Shake hand step 1
@@ -50,8 +49,8 @@ connect(Address, Port, Opts) ->
 %%
 %% Listen on a tcp port
 %%
-listen(Port, Opts) ->
-    {ok, Socket} = gen_udp:open(Port, [binary]),
+listen(Port) ->
+    {ok, Socket} = gen_udp:open(Port, [binary, {reuseaddr, true}]),
     {ok, Socket}.
 
 %%
@@ -87,12 +86,12 @@ accept(Socket) ->
              end
     end.
 
-%%%
-%%% Close
-%%%
-%close(S) ->
-%    inet:tcp_close(S).
-%
+%%
+%% Close
+%%
+close(S) ->
+    gen_udp:close(S).
+
 %%%
 %%% Send
 %%%
