@@ -13,6 +13,9 @@ server(Port) ->
 client(Port) ->
     ubt_socket:connect("127.0.0.1", Port).
 
+test_packet_out() ->
+    ubt_socket:connect("202.116.64.9", 80).
+
 
 
 
