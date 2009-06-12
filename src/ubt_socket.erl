@@ -13,8 +13,8 @@
 %% Connect a socket
 %%
 connect(Address, Port) ->
-    {ok, Socket} = gen_udp:open(0, [binary]),
-    {ok, LocalPort} = inet:port(Socket),
+    {ok, LSocket} = gen_udp:open(0, [binary]),
+    {ok, LocalPort} = inet:port(LSocket),
     % Shake hand step 1
     ConnectHeader = #ubt_header{
         syn = 1,
@@ -22,15 +22,16 @@ connect(Address, Port) ->
         dst_port = Port,
         seq_no = 0
     },
+    io:format("Step 1:~p~n", [ConnectHeader]),
     ConnectPacket = ubt_packer:pack({ConnectHeader, <<>>}),
-    ok = gen_udp:send(Socket, Address , Port, ConnectPacket),
+    ok = gen_udp:send(LSocket, Address , Port, ConnectPacket),
     receive
-        {udp, Socket,  _, _, Packet} ->
-            { Header, Rest } = ubt_packer:unpack(Packet),
+        {udp, LSocket,  _, _, Packet} ->
+            io:format("Step 2 ack: ~p~n", [{udp, LSocket, Packet}]),
+            { Header, _Rest } = ubt_packer:unpack(Packet),
             if Header#ubt_header.syn == 1 ->
-                    % TODO: set_things_up()
                     % Shake hand step 3
-                    {ok, LocalPort} = inet:port(Socket),
+                    {ok, LocalPort} = inet:port(LSocket),
                     EstablishedHeader = #ubt_header{
                         syn = 0,
                         ack = 1,
@@ -39,10 +40,14 @@ connect(Address, Port) ->
                         seq_no = 1,
                         ack_no = Header#ubt_header.seq_no + 1
                     },
-                    io:format("~p~n", [EstablishedHeader]),
+                    io:format("Step 3:~p~n", [EstablishedHeader]),
                     EstablishedPacket = ubt_packer:pack({EstablishedHeader, <<>>}),
-                    ok = gen_udp:send(Socket, Address, Port, EstablishedPacket),
-                    {ok, Socket}
+                    ok = gen_udp:send(LSocket, Address, Port, EstablishedPacket),
+                    {ok, #ubt_struct{
+                            l_sock = LSocket,
+                            r_addr = Address,
+                            r_port = Port
+                            }}
             end
     end.
 
@@ -50,20 +55,22 @@ connect(Address, Port) ->
 %% Listen on a tcp port
 %%
 listen(Port) ->
-    {ok, Socket} = gen_udp:open(Port, [binary, {reuseaddr, true}]),
-    {ok, Socket}.
+    {ok, LSocket} = gen_udp:open(Port, [binary, {reuseaddr, true}]),
+    {ok, #ubt_struct{
+                l_sock = LSocket
+                }}.
 
 %%
 %% Generic tcp accept
 %%
 accept(Socket) ->
+    LSocket = Socket#ubt_struct.l_sock,
     receive
-        {udp, Socket, Address, Port, Packet} ->
-            io:format("~p~n", [{udp, Socket, Address, Port, Packet}]),
+        {udp, LSocket, Address, Port, Packet} ->
+            io:format("Step 1 ack: ~p~n", [{udp, LSocket, Address, Port, Packet}]),
             { Header, Rest } = ubt_packer:unpack(Packet),
             % Shake hand step 2
-            % set_things_up()
-            {ok, LocalPort} = inet:port(Socket),
+            {ok, LocalPort} = inet:port(LSocket),
             ConfirmConnectHeader = #ubt_header{
                 syn = 1,
                 ack = 1,
@@ -72,16 +79,20 @@ accept(Socket) ->
                 seq_no = 0,
                 ack_no = Header#ubt_header.seq_no + 1
             },
-            io:format("~p~n", [ConfirmConnectHeader]),
+            io:format("Step 2: ~p~n", [ConfirmConnectHeader]),
             ConfirmConnectPacket = ubt_packer:pack({ConfirmConnectHeader, <<>>}),
-            ok = gen_udp:send(Socket, Address, Port, ConfirmConnectPacket),
+            ok = gen_udp:send(LSocket, Address, Port, ConfirmConnectPacket),
             receive
-                {udp, Socket, Address, Port, Packet} ->
+                {udp, LSocket, Address, Port, Packet} ->
+                    io:format("Step 3 ack: ~p~n", [{udp, LSocket, Address, Port, Packet}]),
                     { Header, Rest } = ubt_packer:unpack(Packet),
                     if ((Header#ubt_header.syn == 0)
                         and (Header#ubt_header.ack == 1))
                         and (Header#ubt_header.rst == 0) ->
-                        {ok, Socket}
+                        {ok, Socket#ubt_struct{
+                                    r_addr = Address,
+                                    r_port = Port
+                                }}
                     end
              end
     end.
@@ -89,8 +100,8 @@ accept(Socket) ->
 %%
 %% Close
 %%
-close(S) ->
-    gen_udp:close(S).
+close(Socket) ->
+    gen_udp:close(Socket#ubt_struct.l_sock).
 
 %%%
 %%% Send

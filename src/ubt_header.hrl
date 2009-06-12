@@ -17,3 +17,11 @@
         fin = 0,
         wndw = 0
     }).
+
+-record(ubt_struct,
+    {
+        l_sock,
+        r_addr = none,
+        r_port = none
+    }
+).
