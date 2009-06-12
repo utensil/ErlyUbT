@@ -26,7 +26,7 @@ connect(Address, Port) ->
     ConnectPacket = ubt_packer:pack({ConnectHeader, <<>>}),
     ok = gen_udp:send(LSocket, Address , Port, ConnectPacket),
     receive
-        {udp, LSocket,  _, _, Packet} ->
+        {udp, LSocket,  RAddress, RPort, Packet} ->
             io:format("Step 2 ack: ~p~n", [{udp, LSocket, Packet}]),
             { Header, _Rest } = ubt_packer:unpack(Packet),
             if Header#ubt_header.syn == 1 ->
@@ -45,8 +45,8 @@ connect(Address, Port) ->
                     ok = gen_udp:send(LSocket, Address, Port, EstablishedPacket),
                     {ok, #ubt_struct{
                             l_sock = LSocket,
-                            r_addr = Address,
-                            r_port = Port
+                            r_addr = RAddress,
+                            r_port = RPort
                             }}
             end
     end.
