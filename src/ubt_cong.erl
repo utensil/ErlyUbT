@@ -10,9 +10,9 @@ sender_cong({Status, Threshold, CongWin}) ->
             { normal, Threshold, CongWin + 1};
         
         triple_ack ->
-            { triple_ack, CongWin / 2, CongWin / 2};
+            { normal, CongWin / 2, CongWin / 2};
         time_out ->
-            { time_out, CongWin / 2, 1}
+            { normal, CongWin / 2, 2 }
     end.
 
 % receiver side
