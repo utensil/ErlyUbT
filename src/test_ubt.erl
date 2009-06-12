@@ -7,8 +7,8 @@ run() ->
    
 server(Port) ->
     {ok, Socket} = ubt_socket:listen(Port),
-    {ok, Socket} = ubt_socket:accept(Socket),
-    ubt_socket:close(Socket).
+    {ok, New_Socket} = ubt_socket:accept(Socket),
+    ubt_socket:close(New_Socket).
 
 client(Port) ->
     ubt_socket:connect("127.0.0.1", Port).

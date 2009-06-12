@@ -68,7 +68,7 @@ accept(Socket) ->
     receive
         {udp, LSocket, Address, Port, Packet} ->
             io:format("Step 1 ack: ~p~n", [{udp, LSocket, Address, Port, Packet}]),
-            { Header, Rest } = ubt_packer:unpack(Packet),
+            { Header, _Rest } = ubt_packer:unpack(Packet),
             % Shake hand step 2
             {ok, LocalPort} = inet:port(LSocket),
             ConfirmConnectHeader = #ubt_header{
@@ -83,12 +83,12 @@ accept(Socket) ->
             ConfirmConnectPacket = ubt_packer:pack({ConfirmConnectHeader, <<>>}),
             ok = gen_udp:send(LSocket, Address, Port, ConfirmConnectPacket),
             receive
-                {udp, LSocket, Address, Port, Packet} ->
-                    io:format("Step 3 ack: ~p~n", [{udp, LSocket, Address, Port, Packet}]),
-                    { Header, Rest } = ubt_packer:unpack(Packet),
-                    if ((Header#ubt_header.syn == 0)
-                        and (Header#ubt_header.ack == 1))
-                        and (Header#ubt_header.rst == 0) ->
+                {udp, LSocket, Address, Port, Packet3} ->
+                    io:format("Step 3 ack: ~p~n", [{udp, LSocket, Address, Port, Packet3}]),
+                    { Header3, _Rest3 } = ubt_packer:unpack(Packet3),
+                    if ((Header3#ubt_header.syn == 0)
+                        and (Header3#ubt_header.ack == 1))
+                        and (Header3#ubt_header.rst == 0) ->
                         {ok, Socket#ubt_struct{
                                     r_addr = Address,
                                     r_port = Port
