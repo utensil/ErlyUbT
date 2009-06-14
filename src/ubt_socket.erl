@@ -119,10 +119,61 @@ established_loop(Socket) ->
         {udp, LSocket, Address, Port, Packet} ->
             io:format("unprocessed UDP packet: ~p~n",
                         [{udp, LSocket, Address, Port, Packet}]),
-            established_loop(Socket);
+            { Header, _Rest } = ubt_packer:unpack(Packet),
+            % first we should process Rest(not imped)
+            % then
+            if
+                Header#ubt_header.fin == 1 ->
+                    closing(
+                        Socket#ubt_struct{rcv_seq = Header#ubt_header.seq_no +1},
+                        passive_react);
+                true ->
+                    established_loop(Socket)                
+            end;
         {update_socket, NewSocket} ->
             established_loop(NewSocket)
     end.
+    
+closing(Socket, State) ->
+    {LSocket, Address, Port} =
+    { Socket#ubt_struct.l_sock,
+      Socket#ubt_struct.r_addr,
+      Socket#ubt_struct.r_port },
+    {ok, LocalPort} = inet:port(LSocket),
+    case State of
+        passive_react ->
+            io:format("Fin 1 received. ~n"),
+            AckFinHeader = #ubt_header{
+                ack = 1,
+                src_port = LocalPort,
+                dst_port = Port,
+                seq_no = Socket#ubt_struct.snd_seq,
+                ack_no = Socket#ubt_header.rcv_seq + 1
+            },
+            io:format("Fin 1 Ack sent: ~p~n", [AckFinHeader]),
+            AckFinPacket = ubt_packer:pack({AckFinHeader, <<>>}),
+            gen_udp:send(LSocket, Address, Port, AckFinPacket),
+            %send fin2,
+            void,
+            closing(Socket, passive_wait);
+       passive_wait ->
+            receive
+                {udp, LSocket, Address, Port, Packet} ->
+                    if 
+                        Header3#ubt_header.ack == 1 ->
+                            %close
+                            void
+                    end
+            end;
+       active_fin ->
+           % send fin 1
+            void;
+       active_wait ->
+           % wait fin 1 ack.
+           % close
+            void
+       end.
+
     
 spawn_established_loop(Socket) ->
     %create a background process looping in the established status

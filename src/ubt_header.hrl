@@ -25,7 +25,9 @@
         r_port = none,
         fg_pid = 0, % in the active mode(if one day implements) of ubt,
         % the user/fg can receive ubt messages to process them
-        bg_pid = 0 % once the connection is established, all send/recv/close
+        bg_pid = 0, % once the connection is established, all send/recv/close
+        snd_seq = 0,
+        rcv_seq = 0
         % operations are done by sending messages to Background process
 %        timout = {}, %suppose to be a timout_struct
 %        %%timestamp is for each MSS
