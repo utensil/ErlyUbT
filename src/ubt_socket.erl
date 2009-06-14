@@ -148,7 +148,7 @@ closing(Socket, State) ->
                 src_port = LocalPort,
                 dst_port = Port,
                 seq_no = Socket#ubt_struct.snd_seq,
-                ack_no = Socket#ubt_header.rcv_seq + 1
+                ack_no = Socket#ubt_struct.rcv_seq + 1
             },
             io:format("Fin 1 Ack sent: ~p~n", [AckFinHeader]),
             AckFinPacket = ubt_packer:pack({AckFinHeader, <<>>}),
@@ -159,8 +159,9 @@ closing(Socket, State) ->
        passive_wait ->
             receive
                 {udp, LSocket, Address, Port, Packet} ->
+                    { Header, _Rest } = ubt_packer:unpack(Packet),
                     if 
-                        Header3#ubt_header.ack == 1 ->
+                        Header#ubt_header.ack == 1 ->
                             %close
                             void
                     end
