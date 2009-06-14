@@ -106,16 +106,19 @@ accept(Socket) ->
 %% Close
 %%
 close(Socket) ->
+    io:format("Begin closing Socket: ~p~n", [Socket]),
     if
         Socket#ubt_struct.already_closing == true ->
+            io:format("Already closing...~n"),
             void;
         true ->
+            io:format("Closing...~n"),
             Socket#ubt_struct.bg_pid ! { self(), active_close }
     end,
     BgPid = Socket#ubt_struct.bg_pid,
     receive
         {BgPid, ubt_closed} ->
-            io:format("realy closed"),
+            io:format("really closed"),
             gen_tcp:close(Socket#ubt_struct.l_sock)
     end.
 
@@ -209,7 +212,7 @@ closing(Socket, State) ->
                     if 
                         Header#ubt_header.ack == 1 ->
                             io:format("Fin 1 Ack received.~n"),
-                            gen_tcp:close(LSocket)
+                            Socket#ubt_struct.fg_pid ! { self(), ubt_closed}
                     end
             end,
            % wait fin 2
