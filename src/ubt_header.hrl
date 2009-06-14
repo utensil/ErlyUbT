@@ -27,7 +27,8 @@
         % the user/fg can receive ubt messages to process them
         bg_pid = 0, % once the connection is established, all send/recv/close
         snd_seq = 0,
-        rcv_seq = 0
+        rcv_seq = 0,
+        already_closing = false
         % operations are done by sending messages to Background process
 %        timout = {}, %suppose to be a timout_struct
 %        %%timestamp is for each MSS

@@ -106,13 +106,25 @@ accept(Socket) ->
 %% Close
 %%
 close(Socket) ->
-    gen_udp:close(Socket#ubt_struct.l_sock).
+    if
+        Socket#ubt_struct.already_closing == true ->
+            void;
+        true ->
+            Socket#ubt_struct.bg_pid ! { self(), active_close }
+    end,
+    BgPid = Socket#ubt_struct.bg_pid,
+    receive
+        {BgPid, ubt_closed} ->
+            io:format("realy closed"),
+            gen_tcp:close(Socket#ubt_struct.l_sock)
+    end.
 
 established_loop(Socket) ->
     {LSocket, Address, Port} =
             { Socket#ubt_struct.l_sock,
               Socket#ubt_struct.r_addr,
               Socket#ubt_struct.r_port },
+    BgPid = Socket#ubt_struct.bg_pid,
     receive
         test ->
             io:format("Don't test me, I'm fine: ~p~n", [Socket]);
@@ -131,7 +143,9 @@ established_loop(Socket) ->
                     established_loop(Socket)                
             end;
         {update_socket, NewSocket} ->
-            established_loop(NewSocket)
+            established_loop(NewSocket);
+        {BgPid, active_close} ->
+            closing(Socket, active_fin)
     end.
     
 closing(Socket, State) ->
@@ -153,26 +167,61 @@ closing(Socket, State) ->
             io:format("Fin 1 Ack sent: ~p~n", [AckFinHeader]),
             AckFinPacket = ubt_packer:pack({AckFinHeader, <<>>}),
             gen_udp:send(LSocket, Address, Port, AckFinPacket),
-            %send fin2,
-            void,
+            Fin2Header = #ubt_header{
+                fin = 1,
+                src_port = LocalPort,
+                dst_port = Port,
+                seq_no = Socket#ubt_struct.snd_seq + 1,
+                ack_no = Socket#ubt_struct.rcv_seq + 2
+            },
+            io:format("Fin 2 sent: ~p~n", [Fin2Header]),
+            Fin2Packet = ubt_packer:pack({Fin2Header, <<>>}),
+            gen_udp:send(LSocket, Address, Port, Fin2Packet),
             closing(Socket, passive_wait);
        passive_wait ->
+           % wait fin 2 ack
             receive
                 {udp, LSocket, Address, Port, Packet} ->
                     { Header, _Rest } = ubt_packer:unpack(Packet),
                     if 
                         Header#ubt_header.ack == 1 ->
-                            %close
-                            void
+                            io:format("Fin 2 Ack received, connection closed passively.~n"),
+                            Socket#ubt_struct.fg_pid ! { self(), ubt_closed}
                     end
             end;
        active_fin ->
-           % send fin 1
-            void;
+            Fin1Header = #ubt_header{
+                fin = 1,
+                src_port = LocalPort,
+                dst_port = Port,
+                seq_no = Socket#ubt_struct.snd_seq,
+                ack_no = Socket#ubt_struct.rcv_seq + 1
+            },
+            io:format("Fin 1 sent: ~p~n", [Fin1Header]),
+            Fin1Packet = ubt_packer:pack({Fin1Header, <<>>}),
+            gen_udp:send(LSocket, Address, Port, Fin1Packet),
+            closing(Socket#ubt_struct{already_closing = true}, active_wait);
        active_wait ->
-           % wait fin 1 ack.
-           % close
-            void
+            % wait fin 1 ack.
+            receive
+                {udp, LSocket, Address, Port, Packet} ->
+                    { Header, _Rest } = ubt_packer:unpack(Packet),
+                    if 
+                        Header#ubt_header.ack == 1 ->
+                            io:format("Fin 1 Ack received.~n"),
+                            gen_tcp:close(LSocket)
+                    end
+            end,
+           % wait fin 2
+           receive
+                {udp, LSocket, Address, Port, Packet2} ->
+                    { Header2, _Rest2 } = ubt_packer:unpack(Packet2),
+                    if 
+                        Header2#ubt_header.fin == 1 ->
+                            io:format("Fin 2 received, connection closed actively~n"),
+                            gen_tcp:close(LSocket)
+                    end
+            end
        end.
 
     
