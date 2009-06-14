@@ -1,0 +1,14 @@
+=what's in the test directory=
+
+sorry, I didn't use it as unit tests, instead, it was just some practice in erlang:
+
+First, I learned the most basic usage of gen_tcp, that's gonna be the interface
+of my little ubt;
+
+and then, I practiced with gen_udp more extencively than gen_tcp, because it's
+gonna be my tool to implement ubt;
+
+after that, I studied 16.1 of Programming Erlang, followed the evolution path of
+general server, and played with it a little bit.
+
+The above would be the keystone of my little UbT(UDP based TCP) implementation.
