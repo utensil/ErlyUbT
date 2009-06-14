@@ -43,11 +43,14 @@ connect(Address, Port) ->
                     io:format("Step 3:~p~n", [EstablishedHeader]),
                     EstablishedPacket = ubt_packer:pack({EstablishedHeader, <<>>}),
                     ok = gen_udp:send(LSocket, Address, Port, EstablishedPacket),
-                    {ok, #ubt_struct{
+                    Socket = #ubt_struct{
                             l_sock = LSocket,
                             r_addr = RAddress,
                             r_port = RPort
-                            }}
+                            },
+                            
+                    NewSocket = spawn_established_loop(Socket),
+                    {ok, NewSocket}
             end
     end.
 
@@ -89,10 +92,12 @@ accept(Socket) ->
                     if ((Header3#ubt_header.syn == 0)
                         and (Header3#ubt_header.ack == 1))
                         and (Header3#ubt_header.rst == 0) ->
-                        {ok, Socket#ubt_struct{
-                                    r_addr = Address,
-                                    r_port = Port
-                                }}
+                            NewSocket = spawn_established_loop(
+                                        Socket#ubt_struct{
+                                        r_addr = Address,
+                                        r_port = Port
+                                    }),
+                            {ok, NewSocket}
                     end
              end
     end.
@@ -103,6 +108,29 @@ accept(Socket) ->
 close(Socket) ->
     gen_udp:close(Socket#ubt_struct.l_sock).
 
+established_loop(Socket) ->
+    {LSocket, Address, Port} =
+            { Socket#ubt_struct.l_sock,
+              Socket#ubt_struct.r_addr,
+              Socket#ubt_struct.r_port },
+    receive
+        test ->
+            io:format("Don't test me, I'm fine: ~p~n", [Socket]);
+        {udp, LSocket, Address, Port, Packet} ->
+            io:format("unprocessed UDP packet: ~p~n",
+                        [{udp, LSocket, Address, Port, Packet}]),
+            established_loop(Socket);
+        {update_socket, NewSocket} ->
+            established_loop(NewSocket)
+    end.
+    
+spawn_established_loop(Socket) ->
+    %create a background process looping in the established status
+    BgPid = spawn(fun() -> established_loop(Socket) end),
+    ok = gen_udp:controlling_process(Socket#ubt_struct.l_sock, BgPid),
+    NewSocket = Socket#ubt_struct{ fg_pid = self(), bg_pid = BgPid },
+    BgPid ! {update_socket, NewSocket},
+    NewSocket.
 %%%
 %%% Send
 %%%
